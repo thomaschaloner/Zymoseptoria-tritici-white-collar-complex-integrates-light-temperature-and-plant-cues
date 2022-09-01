@@ -1,0 +1,251 @@
+rm(list=ls())
+######################################################################################################################
+# Load data - 3-hourly resolution geospatial temperature data as R.data file. R.data file is an array with time on 3rd dimension. The code assumes that the JRA-55 data has been pre-processed (e.g., extracted from various .nc files, combined into a single .Rdata file, and converted from Kelvin to degrees Celsius)
+setwd("file path") # set working directory
+load("cta.Rdata") # load the data
+
+######################################################################################################################
+# Remove grid cell e.g., grid cells (pixels) in France
+cta[7,9,] <- NA
+
+######################################################################################################################
+# Remove other grid cells e.g., not a wheat growing area
+cta[,1:4,] <- NA # remove top 4 highest latitudes
+cta[,8,] <- NA # remove lowest latitudes
+cta[7,,] <- NA # remove final row
+
+######################################################################################################################
+# Create hour, year and month vectors
+times <- as.POSIXlt(3600*as.numeric(dimnames(cta)$hour), origin = "1800-01-01")
+hourly <- times # times for whole dataset
+years <- hourly$year+1900 # years for whole dataset
+months <- hourly$mon + 1 # months for whole dataset (+1 because it starts at 0)
+ind <- expand.grid(1:7, 1:9) ; N <- nrow(ind) # pixel IDs
+length(months); length(times) # compare lengths
+
+######################################################################################################################
+######################################################################################################################
+# May - extract days where temperature reached >= X degrees (in this >= 18 degrees)
+######################################################################################################################
+######################################################################################################################
+cta_subset <- cta[,, months == 5] # Month 5 = May
+
+hour_season <- as.numeric(dimnames(cta_subset)[[3]]) # dimnames of 3rd dimension (time)
+time_stamps <- as.POSIXlt(3600*hour_season, origin = "1800-01-01"); time_stamps[c(1, 2)] # convert to year and hour
+years_month <- time_stamps$year+1900 # extract years
+
+# create empty objects to be used in for loop below
+vector_temps <- vector("list", N); hours_id <- vector("list", N); pixel_id <- vector("list", N)
+m1 <- vector("list", N); d1 <- vector("list", N); d2 <- vector("list", N)
+
+cta_subset_y <- NA; J <- length(unique(years_month))
+dat_heat_wave <- vector("list", J)
+
+for(j in 1:J){ # for year j
+  cta_subset_y <- cta_subset[,, years_month == unique(years_month)[j]] # extract temperture data for year j
+  for(i in 1:N){ # for pixel i
+    if(all(is.na(cta_subset_y[ind[i,1], ind[i,2],]))){ # if the pixel is all.na = T
+      vector_temps[[i]] <- NA; d2[[i]] <- NA; pixel_id[[i]] <- NA # Pixel ID NOT recorded if all temps in grid cell = NA
+      
+    } else { # else
+      
+      m1[[i]] <- matrix(cta_subset_y[ind[i,1], ind[i,2],], ncol=8, byrow=TRUE) # create a matrix with 8 columns (because temperature is recorded every 3 hours) - each row is now a 24 hour period
+      d1[[i]] <- as.data.frame(m1[[i]], stringsAsFactors=FALSE) # convert to data frame
+      d2[[i]] <- d1[[i]][rowSums(d1[[i]][1:8] >= 18) > 0, ] #extract rows (days) that have temps >= X degrees
+      vector_temps[[i]] <- nrow(d2[[i]]); pixel_id[[i]] <- i # record number of days >= X degrees, and the relevant pixel ID
+      
+    }
+  }
+  
+  heat_wave_temps <- unlist(vector_temps) # unlist the output
+  heat_wave_pixel_ids <- unlist(pixel_id) # unlist the output
+
+  dat_heat_wave[[j]] <- data.frame(heat_wave_temps, heat_wave_pixel_ids) # create data frame of data (for year j)
+  dat_heat_wave[[j]]$year <- unique(years_month)[j] # record year j for data
+}
+
+dat_heat_wave_may <- do.call("rbind", dat_heat_wave)  # rbind
+dat_heat_wave_may <- dat_heat_wave_may[complete.cases(dat_heat_wave_may),] # remove rows with NA
+dat_heat_wave_may$month <- 5 # record month for data in dataframe
+
+# clear objects from global environment
+rm(cta_subset); rm(hour_season); rm(time_stamps); rm(years_month); rm(vector_temps); rm(hours_id); rm(pixel_id)
+rm(m1); rm(d1); rm(d2); rm(cta_subset_y); rm(J); rm(dat_heat_wave)
+
+
+######################################################################################################################
+######################################################################################################################
+# June - as above
+######################################################################################################################
+######################################################################################################################
+cta_subset <- cta[,, months == 6]
+
+hour_season <- as.numeric(dimnames(cta_subset)[[3]])
+time_stamps <- as.POSIXlt(3600*hour_season, origin = "1800-01-01"); time_stamps[c(1, 2)] 
+years_month <- time_stamps$year+1900
+
+vector_temps <- vector("list", N); hours_id <- vector("list", N); pixel_id <- vector("list", N)
+m1 <- vector("list", N); d1 <- vector("list", N); d2 <- vector("list", N)
+
+cta_subset_y <- NA; J <- length(unique(years_month))
+dat_heat_wave <- vector("list", J)
+
+for(j in 1:J){
+  cta_subset_y <- cta_subset[,, years_month == unique(years_month)[j]]
+  for(i in 1:N){
+    if(all(is.na(cta_subset_y[ind[i,1], ind[i,2],]))){ 
+      vector_temps[[i]] <- NA; d2[[i]] <- NA; pixel_id[[i]] <- NA 
+      
+    } else {
+      
+      m1[[i]] <- matrix(cta_subset_y[ind[i,1], ind[i,2],], ncol=8, byrow=TRUE) 
+      d1[[i]] <- as.data.frame(m1[[i]], stringsAsFactors=FALSE)
+      d2[[i]] <- d1[[i]][rowSums(d1[[i]][1:8] >= 18) > 0, ] 
+      vector_temps[[i]] <- nrow(d2[[i]]); pixel_id[[i]] <- i 
+      
+    }
+  }
+  
+  heat_wave_temps <- unlist(vector_temps)
+  heat_wave_pixel_ids <- unlist(pixel_id)
+  
+  dat_heat_wave[[j]] <- data.frame(heat_wave_temps, heat_wave_pixel_ids) 
+  dat_heat_wave[[j]]$year <- unique(years_month)[j] 
+}
+
+dat_heat_wave_june <- do.call("rbind", dat_heat_wave); dat_heat_wave_june <- dat_heat_wave_june[complete.cases(dat_heat_wave_june),]  
+dat_heat_wave_june$month <- 6  
+
+# clear objects from global environment
+rm(cta_subset); rm(hour_season); rm(time_stamps); rm(years_month); rm(vector_temps); rm(hours_id); rm(pixel_id)
+rm(m1); rm(d1); rm(d2); rm(cta_subset_y); rm(J); rm(dat_heat_wave)
+
+
+######################################################################################################################
+######################################################################################################################
+# July - as above
+######################################################################################################################
+######################################################################################################################
+cta_subset <- cta[,, months == 7] #!!!! July
+
+hour_season <- as.numeric(dimnames(cta_subset)[[3]])
+time_stamps <- as.POSIXlt(3600*hour_season, origin = "1800-01-01"); time_stamps[c(1, 2)] 
+years_month <- time_stamps$year+1900 
+
+vector_temps <- vector("list", N); hours_id <- vector("list", N); pixel_id <- vector("list", N)
+m1 <- vector("list", N); d1 <- vector("list", N); d2 <- vector("list", N)
+
+cta_subset_y <- NA; J <- length(unique(years_month))
+dat_heat_wave <- vector("list", J)
+
+for(j in 1:J){
+  cta_subset_y <- cta_subset[,, years_month == unique(years_month)[j]]
+  for(i in 1:N){
+    if(all(is.na(cta_subset_y[ind[i,1], ind[i,2],]))){ 
+      vector_temps[[i]] <- NA; d2[[i]] <- NA; pixel_id[[i]] <- NA 
+      
+    } else {
+      
+      m1[[i]] <- matrix(cta_subset_y[ind[i,1], ind[i,2],], ncol=8, byrow=TRUE) 
+      d1[[i]] <- as.data.frame(m1[[i]], stringsAsFactors=FALSE)
+      d2[[i]] <- d1[[i]][rowSums(d1[[i]][1:8] >= 18) > 0, ] 
+      vector_temps[[i]] <- nrow(d2[[i]]); pixel_id[[i]] <- i 
+      
+    }
+  }
+  
+  heat_wave_temps <- unlist(vector_temps)
+  heat_wave_pixel_ids <- unlist(pixel_id)
+
+  dat_heat_wave[[j]] <- data.frame(heat_wave_temps, heat_wave_pixel_ids) 
+  dat_heat_wave[[j]]$year <- unique(years_month)[j] 
+}
+
+dat_heat_wave_july <- do.call("rbind", dat_heat_wave); dat_heat_wave_july <- dat_heat_wave_july[complete.cases(dat_heat_wave_july),]  
+dat_heat_wave_july$month <- 7 
+
+# clear objects from global environment
+rm(cta_subset); rm(hour_season); rm(time_stamps); rm(years_month); rm(vector_temps); rm(hours_id); rm(pixel_id)
+rm(m1); rm(d1); rm(d2); rm(cta_subset_y); rm(J); rm(dat_heat_wave)
+
+
+######################################################################################################################
+######################################################################################################################
+# Aug - as above
+######################################################################################################################
+######################################################################################################################
+cta_subset <- cta[,, months == 8] #!!!! Aug
+
+hour_season <- as.numeric(dimnames(cta_subset)[[3]])
+time_stamps <- as.POSIXlt(3600*hour_season, origin = "1800-01-01"); time_stamps[c(1, 2)] 
+years_month <- time_stamps$year+1900 # so you can extract each year
+
+vector_temps <- vector("list", N); hours_id <- vector("list", N); pixel_id <- vector("list", N)
+m1 <- vector("list", N); d1 <- vector("list", N); d2 <- vector("list", N)
+
+cta_subset_y <- NA; J <- length(unique(years_month))
+dat_heat_wave <- vector("list", J)
+
+for(j in 1:J){
+  cta_subset_y <- cta_subset[,, years_month == unique(years_month)[j]]
+  for(i in 1:N){
+    if(all(is.na(cta_subset_y[ind[i,1], ind[i,2],]))){ 
+      vector_temps[[i]] <- NA; d2[[i]] <- NA; pixel_id[[i]] <- NA 
+      
+    } else {
+      
+      m1[[i]] <- matrix(cta_subset_y[ind[i,1], ind[i,2],], ncol=8, byrow=TRUE) 
+      d1[[i]] <- as.data.frame(m1[[i]], stringsAsFactors=FALSE)
+      d2[[i]] <- d1[[i]][rowSums(d1[[i]][1:8] >= 18) > 0, ]
+      vector_temps[[i]] <- nrow(d2[[i]]); pixel_id[[i]] <- i 
+      
+    }
+  }
+  
+  heat_wave_temps <- unlist(vector_temps)
+  heat_wave_pixel_ids <- unlist(pixel_id)
+  
+  dat_heat_wave[[j]] <- data.frame(heat_wave_temps, heat_wave_pixel_ids) 
+  dat_heat_wave[[j]]$year <- unique(years_month)[j] 
+}
+
+dat_heat_wave_aug <- do.call("rbind", dat_heat_wave); dat_heat_wave_aug <- dat_heat_wave_aug[complete.cases(dat_heat_wave_aug),]  
+dat_heat_wave_aug$month <- 8
+
+# clear objects from global environment
+rm(cta_subset); rm(hour_season); rm(time_stamps); rm(years_month); rm(vector_temps); rm(hours_id); rm(pixel_id)
+rm(m1); rm(d1); rm(d2); rm(cta_subset_y); rm(J); rm(dat_heat_wave)
+
+
+######################################################################################################################
+######################################################################################################################
+# Combine all the data together
+######################################################################################################################
+######################################################################################################################
+
+dat_heat_wave_all <- rbind(dat_heat_wave_may, dat_heat_wave_june, dat_heat_wave_july, dat_heat_wave_aug) # combine dataframes together
+colnames(dat_heat_wave_all) <- c("days", "pixel_id", "year", "month") # rename columns
+
+setwd("file path") # set working directory
+write.csv(dat_heat_wave_all, "file.csv") # save the dataset as a .csv file
+
+######################################################################################################################
+######################################################################################################################
+# Process data
+######################################################################################################################
+######################################################################################################################
+
+processed_dat <- aggregate(dat_heat_wave_all$days, list(dat_heat_wave_all$year, dat_heat_wave_all$month), mean)
+# calculate mean days by year and month
+
+processed_dat$sd <- aggregate(dat_heat_wave_all$days, list(dat_heat_wave_all$year, dat_heat_wave_all$month), sd)[,3]
+# calculate sd by year and month
+
+colnames(processed_dat) <- c("year", "month", "mean_days", "sd_days") # rename columns
+
+length(unique(dat_heat_wave_all$pixel_id)) # calculate the number of grid cells/pixels included
+
+processed_dat$n <- 16 # 16 grid cells used to calculate mean and sd in each row
+
+setwd("file path") # set working directory
+write.csv(processed_dat, "file.csv") # save the dataset as a .csv file
