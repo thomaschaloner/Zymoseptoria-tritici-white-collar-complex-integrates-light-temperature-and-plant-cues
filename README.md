@@ -1,0 +1,2 @@
+# Zymoseptoria-tritici-white-collar-complex-integrates-light-temperature-and-plant-cues
+R code associated with Kilaru et al. "Zymoseptoria tritici white-collar complex integrates light, temperature and plant cues to initiate dimorphism and pathogenesis" Nature Communications (2022). CC BY license (Creative Commons Attribution 4.0 International license) (https://creativecommons.org/licenses/by/4.0/)
